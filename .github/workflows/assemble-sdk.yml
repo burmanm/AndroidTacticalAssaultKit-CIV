@@ -19,9 +19,13 @@ jobs:
       uses: actions/checkout@v2
       with:
         fetch-depth: 1
-    - name: Checkout LFS objects
-      run: |
+    - name: Update Ubuntu base
+      run: |        
         apt update
+        apt upgrade -y
+    - name: Checkout LFS objects
+      if: ${{ !env.ACT }}
+      run: |
         apt -y install git-lfs
         git lfs install --local
         git lfs fetch
@@ -48,10 +52,6 @@ jobs:
         echo "ANDROID_BUILD_TOOLS=29.0.3" >> $GITHUB_ENV
         echo "ANDROID_SDK_TOOLS=4333796" >> $GITHUB_ENV
         echo "NDK_VERSION=12b" >> $GITHUB_ENV
-        echo "KEYSTORE_ALIAS=CI" >> $GITHUB_ENV
-        echo "KEYSTORE_STORE_PASSWORD=$(apg -a 1 -n 1 -m 16 -x 16 -E '\')" >> $GITHUB_ENV
-        echo "KEYSTORE_KEY_PASSWORD=$(apg -a 1 -n 1 -m 16 -x 16 -E '\')" >> $GITHUB_ENV
-        mkdir $HOME/secrets
     - name: set up Android SDK
       run: |
        wget --quiet --tries=0 --output-document=android-sdk.zip https://dl.google.com/android/repository/sdk-tools-linux-${ANDROID_SDK_TOOLS}.zip;
@@ -79,9 +79,12 @@ jobs:
        tar xf cmake-3.14.7.tar;
        rm -rf cmake-3.14.7.tar;
        echo "CMAKE_HOME=$PWD/cmake-3.14.7-Linux-x86_64" >> $GITHUB_ENV
+    - name: Fetch dependencies
+      if: ${{ !env.ACT }}
+      run: |        
+        git submodule update --init --recursive
     - name: Build Dependencies
       run: |
-        git submodule update --init --recursive
         pushd .
         cd scripts
         bash ./prebuild.sh
@@ -154,6 +157,11 @@ jobs:
         cp ./build/libs/atak-gradle-takdev-*.jar ../pluginsdk/atak-gradle-takdev.jar
         popd
         mv pluginsdk atak-civ-sdk
+    - if: ${{ env.ACT }}
+      name: Hack container for local development
+      run: |
+          curl -fsSL https://deb.nodesource.com/setup_12.x | sudo -E bash -
+          sudo apt-get install -y nodejs      
     - name: Upload SDK build output
       uses: actions/upload-artifact@v3
       with:
@@ -164,4 +172,4 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: assembleCivRelease
-        path: ATAK/app/build/outputs/apk/civ/release/*.apk
+        path: atak/ATAK/app/build/outputs/apk/civ/release/*.apk
